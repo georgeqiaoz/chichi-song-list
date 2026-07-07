@@ -8,6 +8,8 @@
   :root {
     --bg-deep: #0b0e1f;
     --bg-mid: #171233;
+    --bg-highlight: #1c1840;
+    --controls-bg: rgba(11, 14, 31, 0.82);
     --accent-star: #c9c3ff;
     --text-main: #eae7ff;
     --text-dim: #8b87ad;
@@ -18,12 +20,25 @@
     --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
   }
 
+  /* 每周五(北京时间)的限定主题色 · 樱花粉 */
+  body.friday-theme {
+    --bg-deep: #2a1620;
+    --bg-mid: #3a2130;
+    --bg-highlight: #45283a;
+    --controls-bg: rgba(58, 33, 48, 0.82);
+    --accent-star: #f2b8d1;
+    --text-main: #fbeaf3;
+    --text-dim: #c98aa8;
+    --letter-ghost: rgba(242, 184, 209, 0.12);
+    --card-border: rgba(242, 184, 209, 0.2);
+  }
+
   * { box-sizing: border-box; }
 
   body {
     margin: 0;
     font-family: var(--sans);
-    background: radial-gradient(ellipse at 20% 0%, #1c1840 0%, var(--bg-deep) 55%);
+    background: radial-gradient(ellipse at 20% 0%, var(--bg-highlight) 0%, var(--bg-deep) 55%);
     color: var(--text-main);
     min-height: 100vh;
     overflow-x: hidden;
@@ -64,7 +79,7 @@
     position: sticky;
     top: 0;
     z-index: 5;
-    background: rgba(11, 14, 31, 0.82);
+    background: var(--controls-bg);
     backdrop-filter: blur(10px);
     border-bottom: 1px solid var(--card-border);
     padding: 16px 24px;
@@ -583,10 +598,12 @@ function initStars() {
     }));
   }
 
+  const starColor = getComputedStyle(document.body).getPropertyValue("--accent-star").trim();
+
   let t = 0;
   function draw() {
     ctx.clearRect(0, 0, w, h);
-    ctx.fillStyle = "#c9c3ff";
+    ctx.fillStyle = starColor;
     stars.forEach(s => {
       const a = s.alpha * (0.6 + 0.4 * Math.sin(t * s.twinkleSpeed + s.phase));
       ctx.globalAlpha = a;
@@ -679,6 +696,16 @@ chatSend.addEventListener("click", handleSend);
 chatInput.addEventListener("keydown", (e) => {
   if (e.key === "Enter") handleSend();
 });
+
+// ---------- Friday theme ----------
+function isFridayInBeijing() {
+  const beijingNow = new Date(Date.now() + 8 * 3600000);
+  return beijingNow.getUTCDay() === 5;
+}
+
+if (isFridayInBeijing()) {
+  document.body.classList.add("friday-theme");
+}
 
 // ---------- Init ----------
 async function init() {
