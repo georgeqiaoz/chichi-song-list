@@ -549,7 +549,7 @@ function renderSongs() {
 }
 
 function renderCard(s) {
-  const priceLabel = s.price === null ? "价格 · 待定" : `¥${s.price}`;
+  const priceLabel = s.price === null ? "" : `高能：${s.price}`;
   return `
     <div class="song-card">
       <span class="song-title" title="${s.title}">${s.title}</span>
