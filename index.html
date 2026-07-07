@@ -407,7 +407,7 @@
     <button class="close-btn" id="chatClose">✕</button>
   </div>
   <div class="chat-messages" id="chatMessages">
-    <div class="msg bot">你好!可以问我"有没有xxx这首歌"之类的问题。价格信息目前还没录入,问到价格我会如实告诉你暂时没有这个数据。</div>
+    <div class="msg bot">你好!可以问我吃吃会不会&lt;歌名&gt;,或&lt;歌名&gt;需不需要加钱。价格信息目前还没录入,问到价格我会如实告诉你暂时没有这个数据。如果不在Claude环境此功能暂时不可用。</div>
   </div>
   <div class="chat-hint">demo 版本 · 回答仅基于当前歌单数据</div>
   <div class="chat-input-row">
@@ -418,12 +418,9 @@
 
 <script>
 // ---------- Data source ----------
-// 歌单数据来自 Google Sheets,方便非技术人员用 Excel 一样的界面维护。
-// 换成你自己的表格后,把下面两个值改成你的 Sheet ID 和工作表标签名即可。
-// Sheet ID 在表格网址里: https://docs.google.com/spreadsheets/d/【这一段】/edit
-const SHEET_ID = "1E_IVmcoUFGNyAYTQrj_yDrA6r9SGBB75xJeWwwBru90";
-const SHEET_NAME = "Sheet1";
-const SHEET_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(SHEET_NAME)}`;
+// 歌单数据放在同目录下的 songs.csv 里,直接在 GitHub 网页上编辑这个文件
+// (打开 songs.csv → 点右上角铅笔图标 → 改完提交)就能更新歌单,不用碰这份代码。
+const DATA_URL = "songs.csv";
 
 let SONGS = {};
 let ALL_SONGS = [];
@@ -456,8 +453,8 @@ function parseCSV(text) {
 }
 
 async function loadSongs() {
-  const res = await fetch(SHEET_URL);
-  if (!res.ok) throw new Error(`sheet fetch failed: ${res.status}`);
+  const res = await fetch(DATA_URL);
+  if (!res.ok) throw new Error(`csv fetch failed: ${res.status}`);
   const text = await res.text();
   const rows = parseCSV(text);
   const [header, ...body] = rows;
