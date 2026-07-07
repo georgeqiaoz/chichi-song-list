@@ -394,7 +394,7 @@
 
 <main>
   <div class="count-badge" id="countBadge"></div>
-  <div id="songContainer"></div>
+  <div id="songContainer"><div class="empty-state">加载中...</div></div>
 </main>
 
 <button id="chat-toggle" aria-label="打开问答助手">
@@ -417,25 +417,73 @@
 </div>
 
 <script>
-// ---------- Data ----------
-// price: null = placeholder, not yet filled in
-function song(title) {
-  return { title, price: null };
+// ---------- Data source ----------
+// 歌单数据来自 Google Sheets,方便非技术人员用 Excel 一样的界面维护。
+// 换成你自己的表格后,把下面两个值改成你的 Sheet ID 和工作表标签名即可。
+// Sheet ID 在表格网址里: https://docs.google.com/spreadsheets/d/【这一段】/edit
+const SHEET_ID = "1E_IVmcoUFGNyAYTQrj_yDrA6r9SGBB75xJeWwwBru90";
+const SHEET_NAME = "Sheet1";
+const SHEET_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(SHEET_NAME)}`;
+
+let SONGS = {};
+let ALL_SONGS = [];
+
+function parseCSV(text) {
+  const rows = [];
+  let row = [], field = "", inQuotes = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inQuotes) {
+      if (c === '"') {
+        if (text[i + 1] === '"') { field += '"'; i++; }
+        else inQuotes = false;
+      } else field += c;
+    } else if (c === '"') {
+      inQuotes = true;
+    } else if (c === ",") {
+      row.push(field); field = "";
+    } else if (c === "\n" || c === "\r") {
+      if (c === "\r" && text[i + 1] === "\n") i++;
+      row.push(field); field = "";
+      if (row.length > 1 || row[0] !== "") rows.push(row);
+      row = [];
+    } else {
+      field += c;
+    }
+  }
+  if (field !== "" || row.length) { row.push(field); rows.push(row); }
+  return rows;
 }
 
-const SONGS = {
-  "A": ["暗号","暗香","安静","爱一点","爱的魔法","爱的天国","爱如潮水","爱似水仙","爱丫爱丫","爱你离开","A.I.N.Y","爱的天灵灵","爱久见人心","爱就一个字","爱笑的眼睛","爱要坦荡荡","爱你一兆年","爱你不是两三天","爱了很久的朋友","爱是奖励还是惩罚","A MOMENT LIKE THIS"],
-  "B": ["半空","不该","宝贝","不枉","半情歌","布谷鸟","不应该","白白的","百年孤寂","不眠之夜","把耳朵叫醒","贝加尔湖畔","背对背拥抱","别找我麻烦","不跟你好了","B小调雨后","白鸟过河滩","编号89757","北极星的眼泪","BA BA BA","不要伤心我的宝贝"],
-  "C": ["彩虹","偿还","翅膀","传奇","车站","蝉女","崇拜(梁)","猜不透","从前说","从前慢","敕勒川","超能力","丑八怪","匆匆那年","词不达意","彩虹的微笑","城里的月光","出现又离开","春夏秋冬的你","从一道缝隙看黄昏","C'EST LA VIE","CAN YOU FEEL MY WORLD"],
-  "D": ["大鱼","当你","倒带","稻香","倒数","带我走","胆小鬼","第一次","第一天","独角戏","第三人","等你下课","电台情歌","帝江混沌","二十二(陶喆)","但愿人长久","当爱在靠近","踮起脚尖爱","等下一个他","第一次爱的人","等到世界颠倒","DEAR FRIEND"],
-  "F": ["枫","恶作剧","发如雪","复活节","飞云之下","分手快乐","非你不爱","反方向的钟","风起时想你","FLY AWAY"],
-  "G": ["搁浅","过火","光亮","归零","公主病","过不去","告白气球","勾指起誓","光年之外","孤独颂歌","光的方向","古德奈先生","孤单北半球","给我一个吻","给我一个理由忘记"],
-  "H": ["花","红豆","后来","花园","幻想","海底","画情","好听","红玫瑰","黄昏晓","回娘家","哈哈哈","好想好想","黑色毛衣","呼吸决定","忽然之间","花的嫁纱","蝴蝶泉边","HONEY","还是好朋友","很爱很爱你","会呼吸的痛","会开花的云","化身孤岛的鲸","回不去的从前","还是你的笑容最可爱"]
-};
+async function loadSongs() {
+  const res = await fetch(SHEET_URL);
+  if (!res.ok) throw new Error(`sheet fetch failed: ${res.status}`);
+  const text = await res.text();
+  const rows = parseCSV(text);
+  const [header, ...body] = rows;
+  const catIdx = header.findIndex(h => h.trim() === "分类");
+  const titleIdx = header.findIndex(h => h.trim() === "歌名");
+  const priceIdx = header.findIndex(h => h.trim() === "价格");
+  if (catIdx === -1 || titleIdx === -1) {
+    throw new Error("表头缺少 分类 或 歌名 列");
+  }
 
-const ALL_SONGS = Object.entries(SONGS).flatMap(([cat, titles]) =>
-  titles.map(t => ({ ...song(t), category: cat }))
-);
+  const grouped = {};
+  body.forEach(r => {
+    const cat = (r[catIdx] || "").trim();
+    const title = (r[titleIdx] || "").trim();
+    if (!title) return;
+    const priceRaw = (r[priceIdx] || "").trim();
+    const price = priceRaw === "" ? null : priceRaw;
+    if (!grouped[cat]) grouped[cat] = [];
+    grouped[cat].push({ title, price });
+  });
+
+  const sortedCats = Object.keys(grouped).sort((a, b) => a.localeCompare(b, "zh"));
+  SONGS = {};
+  sortedCats.forEach(c => { SONGS[c] = grouped[c]; });
+  ALL_SONGS = sortedCats.flatMap(cat => SONGS[cat].map(s => ({ ...s, category: cat })));
+}
 
 // ---------- State ----------
 let state = {
@@ -496,7 +544,7 @@ function renderSongs() {
         <div class="section-letter">${cat}</div>
         <div class="section-title">${cat}</div>
         <div class="song-grid">
-          ${SONGS[cat].map(t => renderCard({ title: t, price: null, category: cat })).join("")}
+          ${SONGS[cat].map(s => renderCard({ ...s, category: cat })).join("")}
         </div>
       </div>
     `).join("");
@@ -584,10 +632,10 @@ function appendMessage(text, role) {
 }
 
 async function askAboutSongs(question) {
-  const context = ALL_SONGS.map(s => `${s.title} [分类:${s.category}] 价格:待定`).join("\n");
+  const context = ALL_SONGS.map(s => `${s.title} [分类:${s.category}] 价格:${s.price === null ? "待定" : "¥" + s.price}`).join("\n");
 
   const systemPrompt = `你是一个歌单问答助手。你只能根据下面提供的歌单数据回答问题,不要编造歌单里没有的信息。
-如果被问到价格,如实说明目前歌单里的价格信息还是占位符,尚未录入,不要编造具体数字。
+如果某首歌的价格显示"待定",如实说明这首歌的价格还没有录入,不要编造具体数字。
 如果问的歌不在列表里,直接说没有这首歌。
 如果问题和这个歌单完全无关,礼貌说明你只能回答关于这个歌单的问题。
 回答尽量简短、直接。
@@ -636,9 +684,19 @@ chatInput.addEventListener("keydown", (e) => {
 });
 
 // ---------- Init ----------
-renderCategoryNav();
-renderSongs();
-initStars();
+async function init() {
+  initStars();
+  try {
+    await loadSongs();
+    renderCategoryNav();
+    renderSongs();
+  } catch (err) {
+    console.error(err);
+    document.getElementById("songContainer").innerHTML =
+      `<div class="empty-state">歌单数据加载失败,请稍后刷新重试。</div>`;
+  }
+}
+init();
 </script>
 </body>
 </html>
